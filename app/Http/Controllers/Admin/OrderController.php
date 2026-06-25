@@ -63,14 +63,14 @@ class OrderController extends Controller
                     'no_resi' => $request->no_resi,
                     'kurir' => $request->kurir ?? $order->pengiriman->kurir ?? '-',
                     'ongkir' => $order->ongkir,
-                    'status_pengiriman' => 'dalam_pengiriman',
+                    'status_pengiriman' => 'dalam_perjalanan',
                     'tanggal_kirim' => now(),
                 ]
             );
         } elseif ($request->status === 'selesai') {
             // Mark pengiriman as delivered
             if ($order->pengiriman) {
-                $order->pengiriman->update(['status_pengiriman' => 'terkirim']);
+                $order->pengiriman->update(['status_pengiriman' => 'diterima']);
             }
         }
 

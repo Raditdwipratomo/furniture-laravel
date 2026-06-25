@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entity Relationship Diagram - Furniture Laravel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px;
+        }
+        #erd-canvas { background: #ffffff; }
+        .caption {
+            font-size: 17px;
+            font-weight: 600;
+            color: #222;
+            margin-top: 20px;
+            text-align: center;
+            font-family: 'Times New Roman', Times, serif;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="erd-canvas" width="1100" height="820"></canvas>
+    <div class="caption">Gambar 2.35 Entity Relationship Diagram</div>
+
+    <script>
+        const canvas = document.getElementById('erd-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+
+        // ============================================================
+        // DRAWING HELPERS (matching image style exactly)
+        // ============================================================
+
+        function drawEllipse(cx, cy, rx, ry, text, opts = {}) {
+            const { fill = '#fff', stroke = '#555', lineWidth = 1.3, fontSize = 11, underline = false } = opts;
+            ctx.save();
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fillStyle = fill;
+            ctx.fill();
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = lineWidth;
+            ctx.stroke();
+            ctx.fillStyle = '#333';
+            ctx.font = `${fontSize}px 'Segoe UI', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, cx, cy);
+            if (underline) {
+                const tw = ctx.measureText(text).width;
+                ctx.beginPath();
+                ctx.moveTo(cx - tw / 2, cy + 7);
+                ctx.lineTo(cx + tw / 2, cy + 7);
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawRect(cx, cy, w, h, text, fillColor) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(cx - w / 2, cy - h / 2, w, h);
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 12px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, cx, cy);
+            ctx.restore();
+        }
+
+        function drawDiamond(cx, cy, w, h, text) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - h / 2);
+            ctx.lineTo(cx + w / 2, cy);
+            ctx.lineTo(cx, cy + h / 2);
+            ctx.lineTo(cx - w / 2, cy);
+            ctx.closePath();
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 1.3;
+            ctx.stroke();
+            ctx.fillStyle = '#333';
+            ctx.font = '10px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, cx, cy);
+            ctx.restore();
+        }
+
+        function line(x1, y1, x2, y2) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1.1;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Draw line with arrow at end
+        function arrowLine(x1, y1, x2, y2) {
+            ctx.save();
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1.1;
+            ctx.stroke();
+            // arrowhead
+            const hl = 7;
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - hl * Math.cos(angle - Math.PI / 7), y2 - hl * Math.sin(angle - Math.PI / 7));
+            ctx.lineTo(x2 - hl * Math.cos(angle + Math.PI / 7), y2 - hl * Math.sin(angle + Math.PI / 7));
+            ctx.closePath();
+            ctx.fillStyle = '#666';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Connect attribute ellipse to entity with line
+        function attr(ex, ey, ax, ay, text, pk = false) {
+            line(ex, ey, ax, ay);
+            drawEllipse(ax, ay, 48, 15, text, { underline: pk });
+        }
+
+        // ============================================================
+        // COLORS (matching reference image exactly)
+        // ============================================================
+        const C = {
+            user: '#f2b4b4',        // pink/salmon
+            pesanan: '#fff3bf',      // light warm yellow
+            pembayaran: '#b8e0b8',   // pastel green
+            keranjang: '#fdd49e',    // soft orange
+            kategori: '#fff9a8',     // bright yellow
+            produk: '#b8e0b8',       // pastel green
+            detailPesanan: '#dcc8f0',// light purple/lavender
+            detailKeranjang: '#e0caf0',// light lavender/purple
+        };
+
+        // ============================================================
+        // ENTITY POSITIONS  (matching reference image layout precisely)
+        // 
+        // Reference layout:
+        //   Row 1 (top):        Pembayaran (center-top)
+        //   Row 2 (mid):        User (left) --- Pesanan (center)
+        //   Row 2.5:            Keranjang (center-left, below user)
+        //   Row 3 (right):                               DetailPesanan (right)
+        //   Row 4 (bottom):     Kategori (left) -- Produk (center-left) -- DetailKeranjang (right)
+        // ============================================================
+
+        // Pembayaran - top center
+        const pembayaran = { x: 510, y: 75 };
+
+        // User - middle left
+        const userE = { x: 200, y: 245 };
+
+        // Pesanan - middle center
+        const pesanan = { x: 500, y: 245 };
+
+        // Keranjang - below user, slightly right
+        const keranjang = { x: 310, y: 400 };
+
+        // DetailPesanan - right side
+        const detPes = { x: 810, y: 340 };
+
+        // Kategori - bottom left
+        const kategori = { x: 175, y: 580 };
+
+        // Produk - bottom center
+        const produk = { x: 390, y: 580 };
+
+        // DetailKeranjang - bottom right
+        const detKer = { x: 770, y: 600 };
+
+
+        // ============================================================
+        // RELATIONSHIP DIAMOND POSITIONS
+        // ============================================================
+
+        // User --membuat--> Pesanan
+        const rMembuat = { x: 350, y: 245 };
+
+        // Pesanan --dibayar--> Pembayaran
+        const rDibayar = { x: 410, y: 160 };
+
+        // User --memiliki--> Keranjang
+        const rMemiliki = { x: 230, y: 330 };
+
+        // Pesanan --dipesan--> DetailPesanan (horizontal right)
+        const rDipesan = { x: 660, y: 340 };
+
+        // Pesanan --berisi--> DetailPesanan (from top, vertical)
+        const rBerisi = { x: 810, y: 245 };
+
+        // Kategori --memiliki--> Produk
+        const rMemiliki2 = { x: 282, y: 580 };
+
+        // Produk --dipilih--> DetailKeranjang
+        const rDipilih = { x: 600, y: 600 };
+
+        // Keranjang/Produk --berisi--> DetailKeranjang
+        const rBerisi2 = { x: 660, y: 490 };
+
+
+        // ============================================================
+        // DRAW CONNECTIONS (lines between entities and relationships)
+        // ============================================================
+
+        // ---- User -> membuat -> Pesanan ----
+        line(userE.x + 52, userE.y, rMembuat.x - 32, rMembuat.y);
+        line(rMembuat.x + 32, rMembuat.y, pesanan.x - 55, pesanan.y);
+
+        // ---- Pesanan -> dibayar -> Pembayaran ----
+        line(pesanan.x - 25, pesanan.y - 18, rDibayar.x + 12, rDibayar.y + 16);
+        line(rDibayar.x + 8, rDibayar.y - 16, pembayaran.x - 15, pembayaran.y + 18);
+
+        // ---- User -> memiliki -> Keranjang ----
+        line(userE.x + 15, userE.y + 18, rMemiliki.x - 8, rMemiliki.y - 16);
+        line(rMemiliki.x + 15, rMemiliki.y + 16, keranjang.x - 18, keranjang.y - 15);
+
+        // ---- Pesanan -> dipesan -> DetailPesanan ----
+        line(pesanan.x + 55, pesanan.y + 15, rDipesan.x - 32, rDipesan.y);
+        line(rDipesan.x + 32, rDipesan.y, detPes.x - 68, detPes.y);
+
+        // ---- Pesanan -> berisi -> DetailPesanan (vertical from Pesanan right to top of DetailPesanan) ----
+        line(pesanan.x + 55, pesanan.y - 10, rBerisi.x - 25, rBerisi.y);
+        line(rBerisi.x, rBerisi.y + 18, detPes.x, detPes.y - 20);
+
+        // ---- Kategori -> memiliki -> Produk ----
+        line(kategori.x + 52, kategori.y, rMemiliki2.x - 28, rMemiliki2.y);
+        line(rMemiliki2.x + 28, rMemiliki2.y, produk.x - 46, produk.y);
+
+        // ---- Produk -> dipilih -> DetailKeranjang ----
+        line(produk.x + 46, produk.y + 5, rDipilih.x - 28, rDipilih.y);
+        line(rDipilih.x + 28, rDipilih.y, detKer.x - 72, detKer.y);
+
+        // ---- Produk -> berisi2 -> DetailPesanan (upward from Produk) ----
+        line(produk.x + 35, produk.y - 18, rBerisi2.x - 8, rBerisi2.y + 16);
+        line(rBerisi2.x + 8, rBerisi2.y - 16, detPes.x - 30, detPes.y + 20);
+
+        // ---- Keranjang -> berisi2 -> DetailKeranjang (from keranjang down-right) ----
+        line(keranjang.x + 50, keranjang.y + 10, rBerisi2.x - 25, rBerisi2.y + 5);
+
+
+        // ============================================================
+        // DRAW RELATIONSHIP DIAMONDS
+        // ============================================================
+        drawDiamond(rMembuat.x, rMembuat.y, 64, 34, 'membuat');
+        drawDiamond(rDibayar.x, rDibayar.y, 60, 32, 'dibayar');
+        drawDiamond(rMemiliki.x, rMemiliki.y, 64, 34, 'memiliki');
+        drawDiamond(rDipesan.x, rDipesan.y, 64, 34, 'dipesan');
+        drawDiamond(rBerisi.x, rBerisi.y, 54, 32, 'berisi');
+        drawDiamond(rMemiliki2.x, rMemiliki2.y, 64, 34, 'memiliki');
+        drawDiamond(rDipilih.x, rDipilih.y, 58, 32, 'dipilih');
+        drawDiamond(rBerisi2.x, rBerisi2.y, 54, 32, 'berisi');
+
+
+        // ============================================================
+        // DRAW ENTITIES
+        // ============================================================
+        drawRect(pembayaran.x, pembayaran.y, 115, 32, 'Pembayaran', C.pembayaran);
+        drawRect(userE.x, userE.y, 90, 32, 'User', C.user);
+        drawRect(pesanan.x, pesanan.y, 100, 32, 'Pesanan', C.pesanan);
+        drawRect(keranjang.x, keranjang.y, 100, 32, 'Keranjang', C.keranjang);
+        drawRect(detPes.x, detPes.y, 120, 32, 'DetailPesanan', C.detailPesanan);
+        drawRect(kategori.x, kategori.y, 90, 32, 'Kategori', C.kategori);
+        drawRect(produk.x, produk.y, 82, 32, 'Produk', C.produk);
+        drawRect(detKer.x, detKer.y, 130, 32, 'DetailKeranjang', C.detailKeranjang);
+
+
+        // ============================================================
+        // DRAW ATTRIBUTES
+        // ============================================================
+
+        // --- User attributes (matching reference: user_id top-left, nama top-right, role far-left, password bottom-left, email bottom-right) ---
+        attr(userE.x - 10, userE.y - 16, userE.x - 55, userE.y - 52, 'user_id', true);
+        attr(userE.x + 15, userE.y - 16, userE.x + 55, userE.y - 52, 'nama');
+        attr(userE.x - 45, userE.y, userE.x - 105, userE.y + 5, 'role');
+        attr(userE.x - 15, userE.y + 16, userE.x - 60, userE.y + 52, 'password');
+        attr(userE.x + 15, userE.y + 16, userE.x + 55, userE.y + 52, 'email');
+        attr(userE.x + 45, userE.y - 8, userE.x + 110, userE.y - 35, 'no_hp');
+
+        // --- Pesanan attributes (matching reference: user_id top-left, tanggal_pesan top-right, status bottom-left, total_harga bottom-center, pesanan_id bottom-right) ---
+        attr(pesanan.x - 20, pesanan.y - 16, pesanan.x - 45, pesanan.y - 50, 'user_id');
+        attr(pesanan.x + 30, pesanan.y - 16, pesanan.x + 70, pesanan.y - 50, 'tanggal_pesanan');
+        attr(pesanan.x - 30, pesanan.y + 16, pesanan.x - 65, pesanan.y + 50, 'status');
+        attr(pesanan.x + 5, pesanan.y + 16, pesanan.x + 10, pesanan.y + 52, 'total_harga');
+        attr(pesanan.x + 40, pesanan.y + 16, pesanan.x + 75, pesanan.y + 52, 'pesanan_id', true);
+        attr(pesanan.x - 55, pesanan.y + 10, pesanan.x - 130, pesanan.y + 40, 'alamat_pengiriman');
+
+        // --- Pembayaran attributes (matching reference: pesanan_id top-center, pembayaran_id top-left, metode top-right, bukti_bayar bottom-left, status bottom-right) ---
+        attr(pembayaran.x, pembayaran.y - 16, pembayaran.x + 5, pembayaran.y - 48, 'pesanan_id');
+        attr(pembayaran.x - 58, pembayaran.y - 8, pembayaran.x - 120, pembayaran.y - 30, 'pembayaran_id', true);
+        attr(pembayaran.x + 58, pembayaran.y - 5, pembayaran.x + 120, pembayaran.y - 20, 'metode');
+        attr(pembayaran.x - 58, pembayaran.y + 8, pembayaran.x - 110, pembayaran.y + 30, 'jumlah');
+        attr(pembayaran.x + 58, pembayaran.y + 8, pembayaran.x + 115, pembayaran.y + 30, 'status');
+        attr(pembayaran.x - 10, pembayaran.y + 16, pembayaran.x - 15, pembayaran.y + 48, 'paid_at');
+
+        // --- Keranjang attributes (matching reference: keranjang_id left, user_id right) ---
+        attr(keranjang.x - 50, keranjang.y, keranjang.x - 110, keranjang.y - 10, 'keranjang_id', true);
+        attr(keranjang.x + 50, keranjang.y, keranjang.x + 110, keranjang.y - 10, 'user_id');
+
+        // --- DetailPesanan attributes (matching reference: detail_pesanan_id top-left, pesanan_id top-center, produk_id top-right, qty right, harga bottom-left, subtotal bottom-right) ---
+        attr(detPes.x - 35, detPes.y - 16, detPes.x - 70, detPes.y - 48, 'detail_pesanan_id', true);
+        attr(detPes.x + 5, detPes.y - 16, detPes.x + 15, detPes.y - 50, 'pesanan_id');
+        attr(detPes.x + 60, detPes.y - 8, detPes.x + 130, detPes.y - 25, 'produk_id');
+        attr(detPes.x + 60, detPes.y + 8, detPes.x + 130, detPes.y + 18, 'qty');
+        attr(detPes.x - 25, detPes.y + 16, detPes.x - 50, detPes.y + 52, 'harga');
+        attr(detPes.x + 25, detPes.y + 16, detPes.x + 50, detPes.y + 52, 'subtotal');
+
+        // --- Kategori attributes (matching reference: nama_kategori top, kategori_id bottom) ---
+        attr(kategori.x + 10, kategori.y - 16, kategori.x + 20, kategori.y - 50, 'nama_kategori');
+        attr(kategori.x - 10, kategori.y + 16, kategori.x - 15, kategori.y + 50, 'kategori_id', true);
+
+        // --- Produk attributes (matching reference: kategori_id top-left, produk_id top-left2, nama_produk top-right, gambar bottom-left, harga bottom-center, stok bottom-right) ---
+        attr(produk.x - 20, produk.y - 16, produk.x - 40, produk.y - 48, 'produk_id', true);
+        attr(produk.x + 20, produk.y - 16, produk.x + 50, produk.y - 48, 'nama_produk');
+        attr(produk.x - 41, produk.y - 5, produk.x - 95, produk.y - 18, 'kategori_id');
+        attr(produk.x - 20, produk.y + 16, produk.x - 40, produk.y + 50, 'gambar');
+        attr(produk.x + 10, produk.y + 16, produk.x + 20, produk.y + 52, 'harga');
+        attr(produk.x + 41, produk.y + 10, produk.x + 95, produk.y + 35, 'stok');
+        attr(produk.x - 41, produk.y + 10, produk.x - 100, produk.y + 30, 'deskripsi');
+
+        // --- DetailKeranjang attributes (matching reference: keranjang_id top-left, produk_id top-right, qty right, subtotal bottom-right, detail_keranjang_id bottom-left) ---
+        attr(detKer.x - 30, detKer.y - 16, detKer.x - 60, detKer.y - 48, 'keranjang_id');
+        attr(detKer.x + 30, detKer.y - 16, detKer.x + 65, detKer.y - 48, 'produk_id');
+        attr(detKer.x + 65, detKer.y + 5, detKer.x + 135, detKer.y + 10, 'qty');
+        attr(detKer.x + 20, detKer.y + 16, detKer.x + 50, detKer.y + 52, 'subtotal');
+        attr(detKer.x - 30, detKer.y + 16, detKer.x - 60, detKer.y + 52, 'detail_keranjang_id', true);
+
+    </script>
+</body>
+</html>

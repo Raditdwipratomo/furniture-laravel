@@ -112,7 +112,7 @@
                                             <span class="font-medium text-stone-800" x-text="opt.service + ' - ' + opt.description"></span>
                                             <span class="font-semibold text-amber-600" x-text="'Rp ' + formatNumber(opt.cost)"></span>
                                         </div>
-                                        <p class="text-xs text-stone-500 mt-1">Estimasi: <span x-text="opt.etd"></span> hari</p>
+                                        <p class="text-xs text-stone-500 mt-1">Estimasi: <span x-text="opt.etd"></span></p>
                                     </div>
                                 </div>
                             </label>
